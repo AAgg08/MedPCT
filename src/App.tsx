@@ -215,7 +215,7 @@ const res = await fetch(`${API_URL}/api/weather?lat=33.21&lng=-97.13`);
     // 1) Evaluate Ground transport risk using Backend API (Formal Weighted Additive Model)
     let finalGround = 0;
     try {
-      const res = await fetch('/api/evaluate', {
+      const res = await fetch(`${API_URL}/api/evaluate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
