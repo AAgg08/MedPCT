@@ -113,8 +113,9 @@ export default function App() {
   useEffect(() => {
     const fetchWeather = async () => {
       try {
-        // Using relative path to access the Express middleware running on the same Vite port 3000
-        const res = await fetch('/api/weather?lat=33.21&lng=-97.13');
+        
+const API_URL = import.meta.env.VITE_API_URL;
+const res = await fetch(`${API_URL}/api/weather?lat=33.21&lng=-97.13`);
         if (!res.ok) throw new Error('Live telemetry offline');
         const data = await res.json();
         setTelemetry({
