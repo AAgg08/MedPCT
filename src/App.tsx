@@ -92,7 +92,7 @@ export default function App() {
   });
   
   const [isLoading, setIsLoading] = useState(false);
-  const [mapToken, setMapToken] = useState(localStorage.getItem('MAPBOX_TOKEN') || '');
+  const [mapToken, setMapToken] = useState(import.meta.env.VITE_MAPBOX_TOKEN || localStorage.getItem('MAPBOX_TOKEN') || '');
   const [recentEvaluations, setRecentEvaluations] = useState<RiskEvaluationResult[]>(MOCK_HISTORICAL_ASSESSMENTS);
   const [selectedResult, setSelectedResult] = useState<RiskEvaluationResult | null>(null);
   const [selectedHistoryRow, setSelectedHistoryRow] = useState<RiskEvaluationResult | null>(null);
