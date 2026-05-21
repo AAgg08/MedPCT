@@ -1,5 +1,5 @@
 import express from "express";
-import path from "path";
+import cors from "cors";
 import dotenv from "dotenv";
 import { createClient } from "@supabase/supabase-js";
 
@@ -8,10 +8,17 @@ dotenv.config();
 dotenv.config({ path: '.env.local' });
 
 const app = express();
-const PORT = 3001;
+const PORT = process.env.PORT || 3001;
 
 // Add JSON body parsing middleware
 app.use(express.json());
+
+// Add CORS middleware - allow requests from Vercel frontend
+app.use(cors({
+  origin: 'https://med-pct.vercel.app',
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type']
+}));
 
 // Lazy initialization of Supabase
 let supabase: ReturnType<typeof createClient> | null = null;
@@ -20,7 +27,7 @@ function getSupabase() {
     const supabaseUrl = process.env.SUPABASE_URL;
     const supabaseKey = process.env.SUPABASE_ANON_KEY;
     if (!supabaseUrl || !supabaseKey) {
-      console.warn("⚠️ SUPABASE_URL or SUPABASE_ANON_KEY is missing. Supabase inserts will fail.");
+      console.warn("SUPABASE_URL or SUPABASE_ANON_KEY is missing. Supabase inserts will fail.");
     }
     supabase = createClient(supabaseUrl || 'https://placeholder.supabase.co', supabaseKey || 'placeholder');
   }
@@ -40,7 +47,7 @@ app.post("/api/evaluate", async (req, res) => {
     const normWind = Math.min(100, ((windSpeed || 0) / 50) * 100);
     const normPrecip = Math.min(100, ((precipitation || 0) / 20) * 100);
     const normTraffic = Math.min(100, ((trafficDelay || 0) / 60) * 100);
-    
+
     // Cargo risk mapping
     const isHighRiskCargo = ['Hazardous/Fragile', 'Hazardous', 'Fragile', 'Critical', 'Hazmat'].includes(cargoType);
     const cargoRisk = isHighRiskCargo ? 80 : 20;
@@ -71,7 +78,6 @@ app.post("/api/evaluate", async (req, res) => {
       const { error } = await db
         .from('risk_evaluations')
         .insert([payload]);
-
       if (error) {
         console.error("Supabase insert error:", JSON.stringify(error, null, 2));
       }
@@ -87,20 +93,15 @@ app.post("/api/evaluate", async (req, res) => {
 app.get("/api/weather", async (req, res) => {
   try {
     const { lat, lng } = req.query;
-    
     if (!lat || !lng) {
       return res.status(400).json({ error: "Missing lat or lng" });
     }
-
     const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=precipitation,wind_speed_10m`;
     const response = await fetch(url);
-    
     if (!response.ok) {
       throw new Error("Failed to fetch weather data from Open-Meteo");
     }
-    
     const data = await response.json();
-    
     res.json({
       wind_speed: data.current.wind_speed_10m,
       precipitation: data.current.precipitation
@@ -110,15 +111,6 @@ app.get("/api/weather", async (req, res) => {
     res.status(500).json({ error: "Internal server error connecting to weather API" });
   }
 });
-
-// Production fallback
-if (process.env.NODE_ENV === "production") {
-  const distPath = path.join(process.cwd(), 'dist');
-  app.use(express.static(distPath));
-  app.get('*', (req, res) => {
-    res.sendFile(path.join(distPath, 'index.html'));
-  });
-}
 
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`Express API Server running on port ${PORT}`);
