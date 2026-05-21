@@ -46,7 +46,7 @@ export default function MapboxContainer({
   
   const [isMapReady, setIsMapReady] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
-  const [localToken, setLocalToken] = useState(mapToken || localStorage.getItem('MAPBOX_TOKEN') || '');
+  const [localToken, setLocalToken] = useState(mapToken || import.meta.env.VITE_MAPBOX_TOKEN || localStorage.getItem('MAPBOX_TOKEN') || '');
   const [isSettingPoint, setIsSettingPoint] = useState<'origin' | 'destination' | null>(null);
 
   // Active Map Token check
