@@ -1,0 +1,6 @@
+{
+  "name": "MedPTC",
+  "description": "Tactical EMS dispatch and hospital coordinator decision support model for ground vs. helicopter transport risk analysis.",
+  "requestFramePermissions": ["geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
