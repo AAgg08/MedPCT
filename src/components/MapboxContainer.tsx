@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import { MapPin, Navigation, Compass, ShieldAlert, KeyRound, Loader2, Info } from 'lucide-react';
 import { MedPTCConfig } from '../config';
+import 'mapbox-gl/dist/mapbox-gl.css';
 
 // Set Mapbox token at module level so the map loads immediately on app start
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN || localStorage.getItem('MAPBOX_TOKEN') || '';
