@@ -4,6 +4,14 @@
 
 export type TransportMode = 'GROUND' | 'HELICOPTER' | 'EITHER';
 
+export interface Helipad {
+  id: string;
+  name: string;
+  lat: number;
+  lng: number;
+  status: 'OPEN' | 'CLOSED';
+}
+
 export interface EvaluationInput {
   originLat: number | string;
   originLng: number | string;
@@ -52,4 +60,10 @@ export interface RiskEvaluationResult {
   recommended_mode: TransportMode;
   justification: string;
   created_at: string;
+  nearest_helipad?: {
+    id: string;
+    name: string;
+    distance: number;
+    status: 'OPEN' | 'CLOSED';
+  };
 }
