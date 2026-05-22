@@ -2,10 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import { MapPin, Navigation, Compass, ShieldAlert, KeyRound, Loader2, Info } from 'lucide-react';
 import { MedPTCConfig } from '../config';
-import 'mapbox-gl/dist/mapbox-gl.css';
 
-// Set Mapbox token at module level so the map loads immediately on app start
-mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN || localStorage.getItem('MAPBOX_TOKEN') || '';
 // Inject Mapbox CSS dynamically so developers don't have to worry about template headers
 const useMapboxCSS = () => {
   useEffect(() => {
@@ -49,8 +46,9 @@ export default function MapboxContainer({
   
   const [isMapReady, setIsMapReady] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
-  const [localToken, setLocalToken] = useState(mapToken || import.meta.env.VITE_MAPBOX_TOKEN || localStorage.getItem('MAPBOX_TOKEN') || '');
+  const [localToken, setLocalToken] = useState(mapToken || localStorage.getItem('MAPBOX_TOKEN') || '');
   const [isSettingPoint, setIsSettingPoint] = useState<'origin' | 'destination' | null>(null);
+  const [showAllUSHelipads, setShowAllUSHelipads] = useState(false);
 
   // Active Map Token check
   const activeToken = mapToken || localToken;
@@ -73,17 +71,17 @@ export default function MapboxContainer({
   };
 
   useEffect(() => {
-    const token = activeToken || import.meta.env.VITE_MAPBOX_TOKEN || localStorage.getItem('MAPBOX_TOKEN') || '';  if (!token || !mapContainerRef.current) return;
+    if (!activeToken || !mapContainerRef.current) return;
 
     try {
-      mapboxgl.accessToken = activeToken || import.meta.env.VITE_MAPBOX_TOKEN || localStorage.getItem('MAPBOX_TOKEN') || '';
+      mapboxgl.accessToken = activeToken;
       
       const map = new mapboxgl.Map({
         container: mapContainerRef.current,
         style: MedPTCConfig.MAPBOX.STYLE,
         center: [
-          (origin.lng + destination.lng) / 2,
-          (origin.lat + destination.lat) / 2,
+          (Number(origin.lng) + Number(destination.lng)) / 2,
+          (Number(origin.lat) + Number(destination.lat)) / 2,
         ],
         zoom: MedPTCConfig.MAPBOX.DEFAULT_ZOOM,
         attributionControl: false,
@@ -94,6 +92,85 @@ export default function MapboxContainer({
       map.on('load', () => {
         setIsMapReady(true);
         setMapError(null);
+
+        // Add helipads GeoJSON source & layer
+        if (!map.getSource('helipads-source')) {
+          map.addSource('helipads-source', {
+            type: 'geojson',
+            data: '/helipads.json', // Served statically from Vite /public directory
+          });
+        }
+
+        if (!map.getLayer('helipads-layer')) {
+          map.addLayer({
+            id: 'helipads-layer',
+            type: 'circle',
+            source: 'helipads-source',
+            layout: {
+              'visibility': 'none', // Performance mandate: Keep hidden by default
+            },
+            paint: {
+              'circle-color': '#06b6d4',
+              'circle-radius': [
+                'interpolate',
+                ['exponential', 2],
+                ['zoom'],
+                2, 2.5,
+                8, 5,
+                13, 9,
+                18, 16
+              ],
+              'circle-stroke-width': [
+                'interpolate',
+                ['linear'],
+                ['zoom'],
+                2, 0.5,
+                12, 1.5,
+                18, 3
+              ],
+              'circle-stroke-color': '#ffffff',
+              'circle-opacity': 0.85,
+              'circle-stroke-opacity': 0.9,
+            },
+          });
+        }
+
+        // Add interactive hover popup for the helipad layer
+        const popup = new mapboxgl.Popup({
+          closeButton: false,
+          closeOnClick: false,
+        });
+
+        map.on('mouseenter', 'helipads-layer', (e) => {
+          map.getCanvas().style.cursor = 'pointer';
+          const features = e.features;
+          if (features && features.length > 0) {
+            const feature = features[0];
+            const coordinates = (feature.geometry as any).coordinates.slice();
+            const props = feature.properties;
+            const name = props?.name || 'Helipad';
+            const city = props?.city || '';
+            const state = props?.state || '';
+
+            while (Math.abs(e.lngLat.lng - coordinates[0]) > 180) {
+              coordinates[0] += e.lngLat.lng > coordinates[0] ? 360 : -360;
+            }
+
+            popup.setLngLat(coordinates)
+              .setHTML(`
+                <div style="font-family: monospace; font-size: 11px; padding: 2px;">
+                  <strong style="color: #22d3ee; display: block; margin-bottom: 2px;">${name}</strong>
+                  <span style="color: #94a3b8; font-size: 10px;">${city}${city && state ? ', ' : ''}${state}</span>
+                </div>
+              `)
+              .addTo(map);
+          }
+        });
+
+        map.on('mouseleave', 'helipads-layer', () => {
+          map.getCanvas().style.cursor = '';
+          popup.remove();
+        });
       });
 
       map.on('error', (e) => {
@@ -122,6 +199,20 @@ export default function MapboxContainer({
       setMapError(err.message || 'An explicit error occurred during Mapbox initialization.');
     }
   }, [activeToken]);
+
+  // Dynamically toggle US helipads visibility
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !isMapReady) return;
+
+    if (map.getLayer('helipads-layer')) {
+      map.setLayoutProperty(
+        'helipads-layer',
+        'visibility',
+        showAllUSHelipads ? 'visible' : 'none'
+      );
+    }
+  }, [showAllUSHelipads, isMapReady]);
 
   // Handle markers and route layers
   useEffect(() => {
@@ -272,7 +363,7 @@ export default function MapboxContainer({
   return (
     <div className="relative h-full w-full bg-slate-950 rounded-xl border border-slate-800 overflow-hidden group">
       {/* Simulation / Mock Map View if no valid Token is configured */}
-      {(mapError && !import.meta.env.VITE_MAPBOX_TOKEN) && (
+      {(!activeToken || mapError) && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950 p-6 z-10">
           <div className="absolute inset-0 opacity-10 bg-radar select-none pointer-events-none" />
 
@@ -360,14 +451,32 @@ export default function MapboxContainer({
       )}
 
       {/* Overlay Overlay Info Panel */}
-      <div className="absolute bottom-4 left-4 p-3 bg-slate-900/90 backdrop-blur-md border border-slate-800 rounded-lg max-w-sm pointer-events-auto shadow-2xl z-20">
+      <div className="absolute bottom-4 left-4 p-3 bg-slate-900/95 backdrop-blur-md border border-slate-800 rounded-lg max-w-sm pointer-events-auto shadow-2xl z-20">
         <div className="flex items-start gap-2.5">
           <Info className="h-4 w-4 text-emerald-500 shrink-0 mt-0.5" />
-          <div>
+          <div className="w-full text-left">
             <h4 className="text-xs font-mono font-semibold text-slate-200 uppercase tracking-wide">Live Dispatch Mapping</h4>
             <p className="text-[11px] text-slate-400 leading-relaxed mt-1">
               Solid path indicates ground ambulance routing (color-keyed to ground risk). Dotted cyan line marks the straight-line MEDEVAC flight path vectors.
             </p>
+
+            {/* Show All U.S. Helipads toggle */}
+            <div className="mt-3 pt-2.5 border-t border-slate-800/80 flex items-center justify-between">
+              <label htmlFor="show-all-helipads" className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  id="show-all-helipads"
+                  type="checkbox"
+                  checked={showAllUSHelipads}
+                  onChange={(e) => setShowAllUSHelipads(e.target.checked)}
+                  className="h-3.5 w-3.5 rounded border-slate-700 bg-slate-950 text-emerald-500 focus:ring-0 cursor-pointer accent-emerald-500"
+                />
+                <span className="text-[11px] font-mono text-slate-200 font-medium">Show All U.S. Helipads</span>
+              </label>
+              <div className="flex items-center gap-1.5">
+                <span className={`h-2 w-2 rounded-full transition-colors duration-200 ${showAllUSHelipads ? 'bg-[#06b6d4] animate-pulse' : 'bg-slate-700'}`} />
+                <span className="text-[9px] font-mono text-slate-400">{showAllUSHelipads ? 'Visible' : 'Hidden'}</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
