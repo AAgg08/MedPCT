@@ -15,7 +15,7 @@ import {
   CloudLightning,
   AlertTriangle
 } from 'lucide-react';
-import { EvaluationInput, RiskEvaluationResult } from '../types';
+import { EvaluationInput, RiskEvaluationResult, Helipad } from '../types';
 
 interface RiskSidebarProps {
   onEvaluate: (input: EvaluationInput) => void;
@@ -31,6 +31,8 @@ interface RiskSidebarProps {
     loading: boolean;
     error: string | null;
   };
+  helipads: Helipad[];
+  onUpdateHelipadStatus: (id: string, status: 'OPEN' | 'CLOSED') => Promise<void>;
 }
 
 export default function RiskSidebar({
@@ -42,7 +44,34 @@ export default function RiskSidebar({
   setOriginCoords,
   setDestinationCoords,
   liveTelemetry,
+  helipads = [],
+  onUpdateHelipadStatus,
 }: RiskSidebarProps) {
+  // Find nearest helipad dynamically based on current destination coordinates input
+  const activeDestLat = Number(destinationCoords.lat);
+  const activeDestLng = Number(destinationCoords.lng);
+  
+  let nearestHelipadId = '';
+  let nearestDistance = Infinity;
+
+  if (!isNaN(activeDestLat) && !isNaN(activeDestLng) && activeDestLat !== 0 && activeDestLng !== 0) {
+    helipads.forEach((pad) => {
+      const dLat = (pad.lat - activeDestLat) * (Math.PI / 180);
+      const dLng = (pad.lng - activeDestLng) * (Math.PI / 180);
+      const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(activeDestLat * (Math.PI / 180)) *
+          Math.cos(pad.lat * (Math.PI / 180)) *
+          Math.sin(dLng / 2) *
+          Math.sin(dLng / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      const dist = 6371 * c;
+      if (dist < nearestDistance) {
+        nearestDistance = dist;
+        nearestHelipadId = pad.id;
+      }
+    });
+  }
   // Input tracking
   const [departureTime, setDepartureTime] = useState(
     new Date(Date.now() + 1800000).toISOString().slice(0, 16) // Default 30 mins in future
@@ -209,6 +238,94 @@ export default function RiskSidebar({
         </button>
       </form>
 
+      {/* Helipad Control Node */}
+      <div className="p-5 border-b border-slate-800 bg-slate-950/20 space-y-3">
+        <div className="flex items-center justify-between">
+          <h3 className="text-xs font-mono font-bold tracking-wider text-slate-400 uppercase">Emergency Helipad Registry</h3>
+          <span className="text-[9px] font-mono bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-1.5 py-0.5 rounded font-bold uppercase tracking-widest">
+            Tactical Override
+          </span>
+        </div>
+        <p className="text-[11px] text-slate-400 leading-relaxed font-light text-left">
+          Dispatcher manual override of tactical heliports. Marking the nearest helipad to the receiving center as CLOSED maximizes MEDEVAC evacuation risk vectors.
+        </p>
+
+        {helipads.length === 0 ? (
+          <div className="text-[11px] font-mono text-slate-500 py-3 text-center bg-slate-950/45 border border-slate-850 rounded">
+            No helipads loaded from server.
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {helipads.map((pad) => {
+              const isNearest = pad.id === nearestHelipadId;
+              const isOpen = pad.status === 'OPEN';
+              
+              return (
+                <div 
+                  key={pad.id}
+                  className={`p-3 rounded-lg border transition duration-155 flex flex-col gap-2 ${
+                    isNearest 
+                      ? 'bg-indigo-950/15 border-indigo-500/30 shadow-md shadow-indigo-950/10' 
+                      : 'bg-slate-950/30 border-slate-850'
+                  }`}
+                >
+                  <div className="flex justify-between items-start">
+                    <div className="text-left animate-fade-in">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-xs font-semibold text-slate-200">{pad.name}</span>
+                        {isNearest && (
+                          <span className="text-[9px] font-mono bg-rose-500/20 text-rose-400 border border-rose-500/30 px-1 rounded animate-pulse font-semibold">
+                            Nearest
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-[10px] font-mono text-slate-500 block mt-0.5">
+                        Location: {pad.lat.toFixed(4)}, {pad.lng.toFixed(4)}
+                        {isNearest && ` (~${nearestDistance.toFixed(1)} km)`}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-1 border-t border-slate-850/50">
+                    <span className="text-[10px] font-mono text-slate-400">
+                      Operator Status: 
+                      <span className={`ml-1 font-bold ${isOpen ? 'text-emerald-400' : 'text-red-400'}`}>
+                        {pad.status}
+                      </span>
+                    </span>
+
+                    <div className="flex gap-1">
+                      <button
+                        type="button"
+                        onClick={() => onUpdateHelipadStatus(pad.id, 'OPEN')}
+                        className={`px-2.5 py-1 text-[10px] font-mono uppercase font-bold rounded transition cursor-pointer ${
+                          isOpen 
+                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' 
+                            : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-slate-300 hover:bg-slate-800'
+                        }`}
+                      >
+                        OPEN
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onUpdateHelipadStatus(pad.id, 'CLOSED')}
+                        className={`px-2.5 py-1 text-[10px] font-mono uppercase font-bold rounded transition cursor-pointer ${
+                          !isOpen 
+                            ? 'bg-red-500/20 text-red-300 border border-red-500/30' 
+                            : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-slate-300 hover:bg-slate-800'
+                        }`}
+                      >
+                        CLOSED
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
       {/* Decision Output / Evaluation Results Area */}
       <div className="flex-1 p-5 space-y-5 bg-slate-950/15">
         <h2 className="text-xs font-mono font-bold tracking-wider text-slate-400 uppercase">Live Evaluation Assessment</h2>
@@ -335,6 +452,28 @@ export default function RiskSidebar({
                 </div>
               </div>
             </div>
+
+            {/* Evaluated Nearest Helipad Detail */}
+            {result.nearest_helipad && (
+              <div className="p-4 bg-slate-900 border border-slate-800 rounded-lg text-left">
+                <span className="text-[10px] font-mono uppercase tracking-widest text-slate-400 font-bold block mb-2">Distance-Keyed Heliport</span>
+                <div className="flex items-start justify-between">
+                  <div>
+                    <div className="text-xs font-semibold text-slate-250 mb-0.5">{result.nearest_helipad.name}</div>
+                    <div className="text-[10px] font-mono text-slate-500 leading-normal">
+                      Proximity: {result.nearest_helipad.distance.toFixed(1)} km to Active Center
+                    </div>
+                  </div>
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase ${
+                    result.nearest_helipad.status === 'OPEN' 
+                      ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
+                      : 'bg-red-500/10 text-red-500 border border-red-500/20'
+                  }`}>
+                    {result.nearest_helipad.status}
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
