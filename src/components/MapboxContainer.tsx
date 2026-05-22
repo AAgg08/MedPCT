@@ -46,7 +46,7 @@ export default function MapboxContainer({
   
   const [isMapReady, setIsMapReady] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
-  const [localToken, setLocalToken] = useState(mapToken || localStorage.getItem('MAPBOX_TOKEN') || '');
+  const [localToken, setLocalToken] = useState(mapToken || localStorage.getItem('MAPBOX_TOKEN') || 'pk.eyJ1IjoiYXJ5YW5hIiwiYSI6ImNtcGV0aHlrbDAyZXkycXEzM2Z3b24zcnUifQ.vTqdwrLUgUS1GLEM4u0UVw');
   const [isSettingPoint, setIsSettingPoint] = useState<'origin' | 'destination' | null>(null);
   const [showAllUSHelipads, setShowAllUSHelipads] = useState(false);
 
