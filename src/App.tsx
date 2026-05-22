@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Header from './components/Header';
 import RiskSidebar from './components/RiskSidebar';
 import MapboxContainer from './components/MapboxContainer';
-import { EvaluationInput, RiskEvaluationResult, HistoricalIncident } from './types';
+import { EvaluationInput, RiskEvaluationResult, Helipad } from './types';
 import { MedPTCConfig } from './config';
 import { 
   History, 
@@ -23,30 +23,20 @@ interface VehicleProfile {
   gradient: number;
 }
 
-// Sample prefilled historical assessments so the user instantly sees a populated UI with real logs
 const MOCK_HISTORICAL_ASSESSMENTS: RiskEvaluationResult[] = [
   {
     id: 'eval-fda103',
-    origin_lat: 39.7392,
-    origin_lng: -104.9903,
+    origin_lat: 39.7289,
+    origin_lng: -104.9897,
     destination_lat: 40.0150,
     destination_lng: -105.2705,
     scheduled_departure: '2026-05-20T22:30:00Z',
-    weather_snapshot: {
-      temp: 18,
-      condition: 'Clear sky',
-      wind_speed: 4.2,
-      visibility: 10.0,
-    },
-    traffic_snapshot: {
-      distance_km: 48,
-      duration_min: 38,
-      congestion_level: 'clear',
-    },
+    weather_snapshot: { temp: 18, condition: 'Clear sky', wind_speed: 4.2, visibility: 10.0 },
+    traffic_snapshot: { distance_km: 48, duration_min: 38, congestion_level: 'clear' },
     risk_score_ground: 24,
     risk_score_helicopter: 20,
     recommended_mode: 'HELICOPTER',
-    justification: 'Favorable sky visual flight rules. Ground routes present mild highway construction delays near flyover points.',
+    justification: 'Favorable sky visual flight rules. Ground routes present mild highway construction delays.',
     created_at: '2026-05-20T21:10:00Z',
   },
   {
@@ -82,22 +72,16 @@ export default function App() {
   });
 
   const [activeTab, setActiveTab] = useState<'evaluate' | 'history'>('evaluate');
-  const [origin, setOrigin] = useState<{ lat: number | string; lng: number | string }>({ 
-    lat: '', 
-    lng: '' 
-  });
-  const [destination, setDestination] = useState<{ lat: number | string; lng: number | string }>({ 
-    lat: '', 
-    lng: '' 
-  });
+  const [origin, setOrigin] = useState<{ lat: number | string; lng: number | string }>({ lat: '', lng: '' });
+  const [destination, setDestination] = useState<{ lat: number | string; lng: number | string }>({ lat: '', lng: '' });
+  const [helipads, setHelipads] = useState<Helipad[]>([]);
   
   const [isLoading, setIsLoading] = useState(false);
-  const [mapToken, setMapToken] = useState(import.meta.env.VITE_MAPBOX_TOKEN || localStorage.getItem('MAPBOX_TOKEN') || '');
+  const [mapToken, setMapToken] = useState(localStorage.getItem('MAPBOX_TOKEN') || '');
   const [recentEvaluations, setRecentEvaluations] = useState<RiskEvaluationResult[]>(MOCK_HISTORICAL_ASSESSMENTS);
   const [selectedResult, setSelectedResult] = useState<RiskEvaluationResult | null>(null);
   const [selectedHistoryRow, setSelectedHistoryRow] = useState<RiskEvaluationResult | null>(null);
 
-  // Live telemetry state for default coordinates (33.21, -97.13)
   const [telemetry, setTelemetry] = useState<{
     windSpeed: number | null;
     precipitation: number | null;
@@ -110,12 +94,62 @@ export default function App() {
     error: null
   });
 
+  // Use environment variable for backend communication or default to relative path
+  const API_URL = (import.meta as any).env.VITE_API_URL || "";
+
+  const fetchHelipads = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/helipads`);
+      if (res.ok) {
+        const data = await res.json();
+        setHelipads(data);
+      }
+    } catch (err) {
+      console.error("Error fetching helipads:", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchHelipads();
+  }, [API_URL]);
+
+  const handleUpdateHelipadStatus = async (id: string, status: 'OPEN' | 'CLOSED') => {
+    try {
+      const res = await fetch(`${API_URL}/api/helipads/status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, status })
+      });
+      if (res.ok) {
+        await fetchHelipads();
+        // Update selectedResult or history list if relevant
+        if (selectedResult && selectedResult.nearest_helipad && selectedResult.nearest_helipad.id === id) {
+          const updatedHeliStatus = status;
+          const closedNow = updatedHeliStatus === 'CLOSED';
+          const newHeliScore = closedNow ? 100 : selectedResult.risk_score_helicopter;
+          setSelectedResult(prev => {
+            if (!prev) return null;
+            return {
+              ...prev,
+              risk_score_helicopter: newHeliScore,
+              nearest_helipad: prev.nearest_helipad ? { ...prev.nearest_helipad, status: updatedHeliStatus } : undefined,
+              recommended_mode: closedNow ? 'GROUND' : prev.recommended_mode,
+              justification: closedNow 
+                ? `Nearest helipad is marked CLOSED. Air transport risks maximized. Ground route recommended.` 
+                : prev.justification
+            };
+          });
+        }
+      }
+    } catch (err) {
+      console.error("Failed to update helipad:", err);
+    }
+  };
+
   useEffect(() => {
     const fetchWeather = async () => {
       try {
-        
-const API_URL = import.meta.env.VITE_API_URL;
-const res = await fetch(`${API_URL}/api/weather?lat=33.21&lng=-97.13`);
+        const res = await fetch(`${API_URL}/api/weather?lat=33.21&lng=-97.13`);
         if (!res.ok) throw new Error('Live telemetry offline');
         const data = await res.json();
         setTelemetry({
@@ -129,19 +163,14 @@ const res = await fetch(`${API_URL}/api/weather?lat=33.21&lng=-97.13`);
       }
     };
     fetchWeather();
-  }, []);
+  }, [API_URL]);
 
-  // Trigger local evaluation logic (emulates server algorithm instantly so the MVP works out-of-the-box!)
   const handleEvaluate = async (input: EvaluationInput) => {
     if (input.originLat === '' || input.originLng === '' || input.destinationLat === '' || input.destinationLng === '') {
       return;
     }
 
     setIsLoading(true);
-
-    let liveWind = 0;
-    let livePrecip = 0;
-    let terrainGradient = vehicleProfile.gradient;
 
     let updatedTelemetry = { ...telemetry, loading: true };
     setTelemetry(updatedTelemetry);
@@ -151,6 +180,8 @@ const res = await fetch(`${API_URL}/api/weather?lat=33.21&lng=-97.13`);
     const destLat = Number(input.destinationLat);
     const destLng = Number(input.destinationLng);
 
+    let liveWind = 0;
+    let livePrecip = 0;
     try {
       const weatherRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${origLat}&longitude=${origLng}&current_weather=true&hourly=precipitation`);
       if (weatherRes.ok) {
@@ -171,6 +202,7 @@ const res = await fetch(`${API_URL}/api/weather?lat=33.21&lng=-97.13`);
       setTelemetry(updatedTelemetry);
     }
 
+    let terrainGradient = vehicleProfile.gradient;
     try {
       const elevRes = await fetch(`https://api.open-meteo.com/v1/elevation?latitude=${origLat},${destLat}&longitude=${origLng},${destLng}`);
       if(elevRes.ok) {
@@ -214,8 +246,9 @@ const res = await fetch(`${API_URL}/api/weather?lat=33.21&lng=-97.13`);
 
     // 1) Evaluate Ground transport risk using Backend API (Formal Weighted Additive Model)
     let finalGround = 0;
+    let nearestPadInfo: any = undefined;
     try {
-      const res = await fetch(`${API_URL}/api/evaluate`, {
+      const res = await fetch(`${(import.meta as any).env.VITE_API_URL}/api/evaluate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -231,6 +264,7 @@ const res = await fetch(`${API_URL}/api/weather?lat=33.21&lng=-97.13`);
       if (res.ok) {
         const data = await res.json();
         finalGround = data.riskScore;
+        nearestPadInfo = data.nearestPad;
       } else {
         console.error('Failed to fetch evaluation score from backend');
       }
@@ -247,27 +281,32 @@ const res = await fetch(`${API_URL}/api/weather?lat=33.21&lng=-97.13`);
     }
 
     // 2) Evaluate Helicopter flight risk
-    if (simulatedWind >= conf.WIND_SPEED_LIMIT_MPS) {
-      scoreHeli += conf.WIND_SPEED_CRITICAL_ADD;
-      factors.push(`Wind speed (${simulatedWind} m/s) is equal or greater than safety threshold (${conf.WIND_SPEED_LIMIT_MPS} m/s)`);
-    } else if (simulatedWind >= conf.WIND_SPEED_WARNING_MPS) {
-      scoreHeli += conf.WIND_SPEED_WARN_ADD;
-      factors.push('Elevated wind speed warning flags active');
-    }
+    if (nearestPadInfo && nearestPadInfo.status === 'CLOSED') {
+      scoreHeli = 100;
+      factors.push(`Nearest helipad [${nearestPadInfo.name}] is CLOSED`);
+    } else {
+      if (simulatedWind >= conf.WIND_SPEED_LIMIT_MPS) {
+        scoreHeli += conf.WIND_SPEED_CRITICAL_ADD;
+        factors.push(`Wind speed (${simulatedWind} m/s) is equal or greater than safety threshold (${conf.WIND_SPEED_LIMIT_MPS} m/s)`);
+      } else if (simulatedWind >= conf.WIND_SPEED_WARNING_MPS) {
+        scoreHeli += conf.WIND_SPEED_WARN_ADD;
+        factors.push('Elevated wind speed warning flags active');
+      }
 
-    if (simulatedVisibility < conf.VISIBILITY_HELI_LIMIT_KM) {
-      scoreHeli += conf.VISIBILITY_HELI_WARN_ADD;
-      factors.push('Visual Flight Rules (VFR) obstructed due to cloud ceilings');
-    }
-    if (simulatedTemp < conf.TEMPERATURE_LIMIT_MIN_CELSIUS) {
-      scoreHeli += conf.TEMPERATURE_RISK_ADD;
-      factors.push('Extreme sub-zero operations warning (rotor blade icing probability)');
-    }
+      if (simulatedVisibility < conf.VISIBILITY_HELI_LIMIT_KM) {
+        scoreHeli += conf.VISIBILITY_HELI_WARN_ADD;
+        factors.push('Visual Flight Rules (VFR) obstructed due to cloud ceilings');
+      }
+      if (simulatedTemp < conf.TEMPERATURE_LIMIT_MIN_CELSIUS) {
+        scoreHeli += conf.TEMPERATURE_RISK_ADD;
+        factors.push('Extreme sub-zero operations warning (rotor blade icing probability)');
+      }
 
-    // Baseline outcome mod adjusting (mocking historical statistics match)
-    if (simulatedTemp > 10 && simulatedWind < 6.0) {
-      scoreHeli -= 5;
-      factors.push('Historical record shows excellent heli-evacuation rates in low-wind conditions');
+      // Baseline outcome mod adjusting (mocking historical statistics match)
+      if (simulatedTemp > 10 && simulatedWind < 6.0) {
+        scoreHeli -= 5;
+        factors.push('Historical record shows excellent heli-evacuation rates in low-wind conditions');
+      }
     }
 
     // Clamp scores
@@ -291,10 +330,10 @@ const res = await fetch(`${API_URL}/api/weather?lat=33.21&lng=-97.13`);
 
     const evaluationResult: RiskEvaluationResult = {
       id: `eval-${Math.random().toString(36).substr(2, 6)}`,
-      origin_lat: input.originLat,
-      origin_lng: input.originLng,
-      destination_lat: input.destinationLat,
-      destination_lng: input.destinationLng,
+      origin_lat: Number(input.originLat),
+      origin_lng: Number(input.originLng),
+      destination_lat: Number(input.destinationLat),
+      destination_lng: Number(input.destinationLng),
       scheduled_departure: input.departureTime,
       weather_snapshot: {
         temp: simulatedTemp,
@@ -312,6 +351,12 @@ const res = await fetch(`${API_URL}/api/weather?lat=33.21&lng=-97.13`);
       recommended_mode: recommended,
       justification: justificationStr,
       created_at: new Date().toISOString(),
+      nearest_helipad: nearestPadInfo ? {
+        id: nearestPadInfo.id,
+        name: nearestPadInfo.name,
+        distance: nearestPadInfo.distance,
+        status: nearestPadInfo.status
+      } : undefined
     };
 
     // Update active state
@@ -355,6 +400,8 @@ const res = await fetch(`${API_URL}/api/weather?lat=33.21&lng=-97.13`);
               setOriginCoords={setOrigin}
               setDestinationCoords={setDestination}
               liveTelemetry={telemetry}
+              helipads={helipads}
+              onUpdateHelipadStatus={handleUpdateHelipadStatus}
             />
 
             {/* Right Map Canvas Panel Container */}
