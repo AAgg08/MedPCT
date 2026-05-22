@@ -3,6 +3,8 @@ import mapboxgl from 'mapbox-gl';
 import { MapPin, Navigation, Compass, ShieldAlert, KeyRound, Loader2, Info } from 'lucide-react';
 import { MedPTCConfig } from '../config';
 
+// Set Mapbox token at module level so the map loads immediately on app start
+mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN || localStorage.getItem('MAPBOX_TOKEN') || '';
 // Inject Mapbox CSS dynamically so developers don't have to worry about template headers
 const useMapboxCSS = () => {
   useEffect(() => {
@@ -70,10 +72,10 @@ export default function MapboxContainer({
   };
 
   useEffect(() => {
-    if (!activeToken || !mapContainerRef.current) return;
+    const token = activeToken || import.meta.env.VITE_MAPBOX_TOKEN || localStorage.getItem('MAPBOX_TOKEN') || '';  if (!token || !mapContainerRef.current) return;
 
     try {
-      mapboxgl.accessToken = activeToken;
+      mapboxgl.accessToken = activeToken || import.meta.env.VITE_MAPBOX_TOKEN || localStorage.getItem('MAPBOX_TOKEN') || '';
       
       const map = new mapboxgl.Map({
         container: mapContainerRef.current,
@@ -269,7 +271,7 @@ export default function MapboxContainer({
   return (
     <div className="relative h-full w-full bg-slate-950 rounded-xl border border-slate-800 overflow-hidden group">
       {/* Simulation / Mock Map View if no valid Token is configured */}
-      {(!activeToken || mapError) && (
+      {(mapError && !import.meta.env.VITE_MAPBOX_TOKEN) && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950 p-6 z-10">
           <div className="absolute inset-0 opacity-10 bg-radar select-none pointer-events-none" />
 
