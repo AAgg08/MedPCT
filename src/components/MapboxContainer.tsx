@@ -79,11 +79,8 @@ export default function MapboxContainer({
       const map = new mapboxgl.Map({
         container: mapContainerRef.current,
         style: MedPTCConfig.MAPBOX.STYLE,
-        center: [
-          (Number(origin.lng) + Number(destination.lng)) / 2,
-          (Number(origin.lat) + Number(destination.lat)) / 2,
-        ],
-        zoom: MedPTCConfig.MAPBOX.DEFAULT_ZOOM,
+        center: [-98.5795, 39.8283],
+        zoom: 4,
         attributionControl: false,
       });
 
