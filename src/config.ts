@@ -6,8 +6,8 @@ export const MedPTCConfig = {
   // Mapbox & Coordinates Default configuration
   MAPBOX: {
     // Default Map position centered around a realistic EMS flight/ambulance zone (e.g., Denver/Colorado rocky region)
-    DEFAULT_CENTER: [-104.9903, 39.7392] as [number, number],
-    DEFAULT_ZOOM: 9,
+    DEFAULT_CENTER: [-98.5795, 39.8283] as [number, number],
+    DEFAULT_ZOOM: 4,
     STYLE: 'mapbox://styles/mapbox/dark-v11',
   },
 
