@@ -26,6 +26,8 @@ interface MapboxContainerProps {
   recommendedMode?: 'GROUND' | 'HELICOPTER' | 'EITHER' | null;
   mapToken?: string;
   onTokenChange?: (token: string) => void;
+  settingPoint: 'origin' | 'destination' | null;
+  onSetPointChange: (type: 'origin' | 'destination' | null) => void;
 }
 
 export default function MapboxContainer({
@@ -37,17 +39,20 @@ export default function MapboxContainer({
   recommendedMode,
   mapToken = '',
   onTokenChange,
+  settingPoint,
+  onSetPointChange,
 }: MapboxContainerProps) {
   useMapboxCSS();
 
-  const mapContainerRef = useRef<HTMLDivElement>(null);
+  const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const markersRef = useRef<mapboxgl.Marker[]>([]);
-  
+
   const [isMapReady, setIsMapReady] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
-  const [localToken, setLocalToken] = useState(mapToken || localStorage.getItem('MAPBOX_TOKEN') || 'pk.eyJ1IjoiYXJ5YW5hIiwiYSI6ImNtcGV0aHlrbDAyZXkycXEzM2Z3b24zcnUifQ.vTqdwrLUgUS1GLEM4u0UVw');
-  const [isSettingPoint, setIsSettingPoint] = useState<'origin' | 'destination' | null>(null);
+  const [localToken, setLocalToken] = useState(
+    mapToken || localStorage.getItem('MAPBOX_TOKEN') || 'pk.eyJ1IjoiYXJ5YW5hIiwiYSI6ImNtcGV0aHlrbDAyZXkycXEzM2Z3b24zcnUifQ.vTqdwrLUgUS1GLEM4u0UVw'
+  );
   const [showAllUSHelipads, setShowAllUSHelipads] = useState(false);
 
   // Active Map Token check
@@ -75,7 +80,7 @@ export default function MapboxContainer({
 
     try {
       mapboxgl.accessToken = activeToken;
-      
+
       const map = new mapboxgl.Map({
         container: mapContainerRef.current,
         style: MedPTCConfig.MAPBOX.STYLE,
@@ -155,9 +160,9 @@ export default function MapboxContainer({
 
             popup.setLngLat(coordinates)
               .setHTML(`
-                <div style="font-family: monospace; font-size: 11px; padding: 2px;">
-                  <strong style="color: #22d3ee; display: block; margin-bottom: 2px;">${name}</strong>
-                  <span style="color: #94a3b8; font-size: 10px;">${city}${city && state ? ', ' : ''}${state}</span>
+                <div style="padding: 4px 8px; font-family: monospace; font-size: 11px;">
+                  <strong>${name}</strong><br />
+                  ${city}${city && state ? ', ' : ''}${state}
                 </div>
               `)
               .addTo(map);
@@ -176,11 +181,11 @@ export default function MapboxContainer({
       });
 
       map.on('click', (e) => {
-        if (isSettingPoint) {
+        if (settingPoint) {
           const { lat, lng } = e.lngLat;
           if (onMapClick) {
-            onMapClick(lat, lng, isSettingPoint);
-            setIsSettingPoint(null);
+            onMapClick(lat, lng, settingPoint);
+            onSetPointChange(null);
           }
         }
       });
@@ -227,11 +232,8 @@ export default function MapboxContainer({
       const el = document.createElement('div');
       el.className = 'relative flex items-center justify-center';
       el.innerHTML = `
-        <div class="absolute -top-10 bg-slate-900 border border-slate-700 text-[10px] uppercase font-mono px-2 py-0.5 rounded shadow-lg text-white font-medium tracking-wider whitespace-nowrap">
+        <div style="background-color: ${color}; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 9px; font-weight: bold; box-shadow: 0 2px 8px rgba(0,0,0,0.3);">
           ${label}
-        </div>
-        <div class="h-6 w-6 rounded-full flex items-center justify-center shadow-lg border border-white animate-pulse" style="background-color: ${color}">
-          <div class="h-2 w-2 rounded-full bg-white"></div>
         </div>
       `;
       return el;
@@ -358,123 +360,128 @@ export default function MapboxContainer({
   };
 
   return (
-    <div className="relative h-full w-full bg-slate-950 rounded-xl border border-slate-800 overflow-hidden group">
+    <div className="relative w-full h-screen">
       {/* Simulation / Mock Map View if no valid Token is configured */}
       {(!activeToken || mapError) && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950 p-6 z-10">
-          <div className="absolute inset-0 opacity-10 bg-radar select-none pointer-events-none" />
-
-          {/* Compass Icon Animation */}
-          <div className="relative h-20 w-20 flex items-center justify-center border border-emerald-500/30 rounded-full mb-6">
-            <Compass className="h-10 w-10 text-emerald-500 animate-spin" style={{ animationDuration: '25s' }} />
-            <div className="absolute inset-2 border border-emerald-500/10 rounded-full animate-ping" />
-          </div>
-
-          <h3 className="font-display text-xl font-medium text-slate-100 mb-2">Tactical Map Simulation Active</h3>
-          <p className="text-sm text-slate-400 text-center max-w-md mb-6 leading-relaxed">
-            Please enter your **Mapbox Public Token** to initialize interactive GL rendering. In the meantime, MedPTC coordinates and route lines are plotted below.
-          </p>
-
-          <form onSubmit={handleTokenSubmit} className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-lg p-4 shadow-xl z-20">
-            <div className="flex items-center gap-2 mb-2">
-              <KeyRound className="h-4 w-4 text-emerald-500" />
-              <label className="text-xs font-mono font-medium text-slate-300 uppercase tracking-wider">Mapbox Access Token</label>
+        <div className="absolute inset-0 bg-slate-950 z-20 flex items-center justify-center p-8">
+          <div className="max-w-xl w-full bg-slate-900 border border-slate-800 rounded-lg p-6 space-y-4">
+            {/* Compass Icon Animation */}
+            <div className="flex justify-center mb-4">
+              <Compass className="w-16 h-16 text-emerald-400 animate-pulse" />
             </div>
-            <div className="flex gap-2">
-              <input
-                type="password"
-                placeholder="pk.ey..."
-                value={localToken}
-                onChange={(e) => setLocalToken(e.target.value)}
-                className="flex-1 bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-emerald-500 font-mono"
-              />
+            <h3 className="text-lg font-bold text-slate-100 text-center">Tactical Map Simulation Active</h3>
+            <p className="text-xs text-slate-400 text-center">
+              Please enter your **Mapbox Public Token** to initialize interactive GL rendering. In the meantime, MedPTC coordinates and route lines are plotted below.
+            </p>
+
+            <form onSubmit={handleTokenSubmit} className="flex gap-2">
+              <div className="flex-1 relative">
+                <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600" />
+                <label htmlFor="mapbox-token-input" className="sr-only">Mapbox Access Token</label>
+                <input
+                  id="mapbox-token-input"
+                  type="password"
+                  placeholder="pk.ey..."
+                  value={localToken}
+                  onChange={(e) => setLocalToken(e.target.value)}
+                  className="flex-1 bg-slate-950 border border-slate-700 rounded-md pl-10 pr-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-emerald-500 font-mono w-full"
+                />
+              </div>
               <button
                 type="submit"
-                className="bg-emerald-600 hover:bg-emerald-500 text-zinc-950 font-display font-semibold px-4 py-2 rounded-md text-xs transition duration-200"
+                className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded text-xs font-bold transition"
               >
                 Connect Token
               </button>
-            </div>
+            </form>
+
             {mapError && (
-              <div className="flex items-start gap-2 mt-3 p-2.5 bg-red-950/40 border border-red-900/50 rounded text-red-400 text-xs text-left">
-                <ShieldAlert className="h-4 w-4 mt-0.5 shrink-0" />
-                <span>{mapError}</span>
+              <div className="bg-red-500/10 border border-red-500/20 rounded p-3 flex items-start gap-2">
+                <ShieldAlert className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
+                <p className="text-xs text-red-400">{mapError}</p>
               </div>
             )}
-          </form>
 
-          {/* Mock Interactive Canvas Plot - Allows full simulation and testing without key! */}
-          <div className="mt-8 pt-6 border-t border-slate-800/80 w-full max-w-md flex flex-col gap-3">
-            <div className="flex justify-between items-center bg-slate-900/60 p-3 rounded-lg border border-slate-850">
-              <div className="text-left">
-                <span className="text-[10px] font-mono text-slate-400 block tracking-widest uppercase">Dispatcher Coordinates</span>
-                <div className="flex items-center gap-x-4 mt-1 font-mono text-xs text-emerald-400 font-semibold text-glow-green">
-                  <span>O: {origin.lat === '' ? '---' : Number(origin.lat).toFixed(4)}, {origin.lng === '' ? '---' : Number(origin.lng).toFixed(4)}</span>
-                  <span>D: {destination.lat === '' ? '---' : Number(destination.lat).toFixed(4)}, {destination.lng === '' ? '---' : Number(destination.lng).toFixed(4)}</span>
-                </div>
+            {/* Mock Interactive Canvas Plot - Allows full simulation and testing without key! */}
+            <div className="bg-slate-950/60 border border-slate-800 rounded p-4 space-y-3">
+              <div className="flex items-center gap-2 text-cyan-400 text-xs uppercase font-mono">
+                <MapPin className="w-3.5 h-3.5" />
+                Dispatcher Coordinates
               </div>
-              <div className="flex gap-1.5">
+
+              <div className="text-[10px] text-slate-500 font-mono">
+                O: {origin.lat === '' ? '---' : Number(origin.lat).toFixed(4)}, {origin.lng === '' ? '---' : Number(origin.lng).toFixed(4)}
+                {' '} • {' '}
+                D: {destination.lat === '' ? '---' : Number(destination.lat).toFixed(4)}, {destination.lng === '' ? '---' : Number(destination.lng).toFixed(4)}
+              </div>
+
+              <div className="flex gap-2">
                 <button
-                  onClick={() => setIsSettingPoint(isSettingPoint === 'origin' ? null : 'origin')}
+                  type="button"
+                  onClick={() => onSetPointChange(settingPoint === 'origin' ? null : 'origin')}
                   className={`px-2.5 py-1 text-[10px] font-mono uppercase rounded transition ${
-                    isSettingPoint === 'origin' ? 'bg-blue-900 text-blue-200 border border-blue-600' : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+                    settingPoint === 'origin'
+                      ? 'bg-blue-900 text-blue-200 border border-blue-600'
+                      : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
                   }`}
                 >
                   Set Origin
                 </button>
                 <button
-                  onClick={() => setIsSettingPoint(isSettingPoint === 'destination' ? null : 'destination')}
+                  type="button"
+                  onClick={() => onSetPointChange(settingPoint === 'destination' ? null : 'destination')}
                   className={`px-2.5 py-1 text-[10px] font-mono uppercase rounded transition ${
-                    isSettingPoint === 'destination' ? 'bg-amber-900 text-amber-200 border border-amber-600' : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+                    settingPoint === 'destination'
+                      ? 'bg-amber-900 text-amber-200 border border-amber-600'
+                      : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
                   }`}
                 >
                   Set Dest
                 </button>
               </div>
-            </div>
 
-            {isSettingPoint && (
-              <div className="text-center text-[11px] font-mono text-cyan-400 animate-pulse bg-cyan-950/30 border border-cyan-800/50 rounded py-1.5">
-                Click locations on the mock Map Panel to update dispatch coordinates
-              </div>
-            )}
+              {settingPoint && (
+                <p className="text-[10px] text-cyan-400 italic">
+                  Click locations on the mock Map Panel to update dispatch coordinates
+                </p>
+              )}
+            </div>
           </div>
         </div>
       )}
 
       {/* Actual Map Target Canvas */}
       {activeToken && !mapError && (
-        <div ref={mapContainerRef} className="h-full w-full" />
+        <div ref={mapContainerRef} className="absolute inset-0" />
       )}
 
-      {/* Overlay Overlay Info Panel */}
-      <div className="absolute bottom-4 left-4 p-3 bg-slate-900/95 backdrop-blur-md border border-slate-800 rounded-lg max-w-sm pointer-events-auto shadow-2xl z-20">
-        <div className="flex items-start gap-2.5">
-          <Info className="h-4 w-4 text-emerald-500 shrink-0 mt-0.5" />
-          <div className="w-full text-left">
-            <h4 className="text-xs font-mono font-semibold text-slate-200 uppercase tracking-wide">Live Dispatch Mapping</h4>
-            <p className="text-[11px] text-slate-400 leading-relaxed mt-1">
-              Solid path indicates ground ambulance routing (color-keyed to ground risk). Dotted cyan line marks the straight-line MEDEVAC flight path vectors.
-            </p>
+      {/* Overlay Info Panel */}
+      <div className="absolute bottom-4 left-4 bg-slate-950/90 border border-slate-800 rounded-lg p-4 max-w-sm z-10">
+        <div className="flex items-center gap-2 mb-2">
+          <Info className="w-4 h-4 text-cyan-400" />
+          <h4 className="text-xs font-bold text-slate-100 uppercase">Live Dispatch Mapping</h4>
+        </div>
+        <p className="text-[10px] text-slate-500 leading-relaxed">
+          Solid path indicates ground ambulance routing (color-keyed to ground risk). Dotted cyan line marks the straight-line MEDEVAC flight path vectors.
+        </p>
 
-            {/* Show All U.S. Helipads toggle */}
-            <div className="mt-3 pt-2.5 border-t border-slate-800/80 flex items-center justify-between">
-              <label htmlFor="show-all-helipads" className="flex items-center gap-2 cursor-pointer select-none">
-                <input
-                  id="show-all-helipads"
-                  type="checkbox"
-                  checked={showAllUSHelipads}
-                  onChange={(e) => setShowAllUSHelipads(e.target.checked)}
-                  className="h-3.5 w-3.5 rounded border-slate-700 bg-slate-950 text-emerald-500 focus:ring-0 cursor-pointer accent-emerald-500"
-                />
-                <span className="text-[11px] font-mono text-slate-200 font-medium">Show All U.S. Helipads</span>
-              </label>
-              <div className="flex items-center gap-1.5">
-                <span className={`h-2 w-2 rounded-full transition-colors duration-200 ${showAllUSHelipads ? 'bg-[#06b6d4] animate-pulse' : 'bg-slate-700'}`} />
-                <span className="text-[9px] font-mono text-slate-400">{showAllUSHelipads ? 'Visible' : 'Hidden'}</span>
-              </div>
-            </div>
-          </div>
+        {/* Show All U.S. Helipads toggle */}
+        <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-800">
+          <label htmlFor="show-all-helipads" className="flex items-center gap-2 cursor-pointer">
+            <input
+              id="show-all-helipads"
+              type="checkbox"
+              checked={showAllUSHelipads}
+              onChange={(e) => setShowAllUSHelipads(e.target.checked)}
+              className="h-3.5 w-3.5 rounded border-slate-700 bg-slate-950 text-emerald-500 focus:ring-0 cursor-pointer accent-emerald-500"
+            />
+            <span className="text-[10px] text-slate-400 uppercase font-mono">Show All U.S. Helipads</span>
+          </label>
+          <span className={`text-[9px] uppercase font-mono px-1.5 py-0.5 rounded ${
+            showAllUSHelipads ? 'bg-emerald-500/20 text-emerald-300' : 'bg-slate-800 text-slate-600'
+          }`}>
+            {showAllUSHelipads ? 'Visible' : 'Hidden'}
+          </span>
         </div>
       </div>
     </div>
