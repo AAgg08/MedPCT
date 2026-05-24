@@ -43,20 +43,13 @@ const helipadStatusOverrides: Record<string, HelipadStatus> = {};
 // Helper: load helipads from public/helipads.json and apply status overrides
 function loadHelipads(): any[] {
   try {
-    // Try multiple paths for Render vs local
-    const paths = [
-      path.join(process.cwd(), 'public', 'helipads.json'),
-      path.join(__dirname, '..', 'public', 'helipads.json'),
-      path.join(__dirname, 'public', 'helipads.json'),
-    ];
-    let raw = '';
-    for (const p of paths) {
-      if (fs.existsSync(p)) {
-        raw = fs.readFileSync(p, 'utf-8');
-        break;
-      }
+    // On Render, process.cwd() is /opt/render/project/src
+    const helipadPath = path.join(process.cwd(), 'public', 'helipads.json');
+    if (!fs.existsSync(helipadPath)) {
+      console.warn('helipads.json not found at:', helipadPath);
+      return [];
     }
-    if (!raw) return [];
+    const raw = fs.readFileSync(helipadPath, 'utf-8');
     const geojson = JSON.parse(raw);
     const features = geojson.features || [];
     return features.map((f: any) => ({
