@@ -391,7 +391,7 @@ export default function App() {
           /* ACTIVE EVALUATOR LAYOUT */
           <div className="flex flex-col lg:flex-row flex-1 overflow-hidden">
             {/* Left Evaluation Form & Outcome Sidebar */}
-            <RiskSidebar 
+            RiskSidebar 
               onEvaluate={handleEvaluate}
               isLoading={isLoading}
               result={selectedResult}
