@@ -77,8 +77,7 @@ export default function App() {
   const [helipads, setHelipads] = useState<Helipad[]>([]);
   
   const [isLoading, setIsLoading] = useState(false);
-  const [mapToken, setMapToken] = useState(localStorage.getItem('MAPBOX_TOKEN') || null);  const [recentEvaluations, setRecentEvaluations] = useState<RiskEvaluationResult[]>(MOCK_HISTORICAL_ASSESSMENTS);
-  const [selectedResult, setSelectedResult] = useState<RiskEvaluationResult | null>(null);
+  const [mapToken, setMapToken] = useState(localStorage.getItem('MAPBOX_TOKEN'));  const [selectedResult, setSelectedResult] = useState<RiskEvaluationResult | null>(null);
   const [selectedHistoryRow, setSelectedHistoryRow] = useState<RiskEvaluationResult | null>(null);
 
   const [telemetry, setTelemetry] = useState<{
