@@ -53,7 +53,7 @@ export default function MapboxContainer({
   const [localToken, setLocalToken] = useState(
     mapToken || localStorage.getItem('MAPBOX_TOKEN') || 'pk.eyJ1IjoiYXJ5YW5hIiwiYSI6ImNtcGV0aHlrbDAyZXkycXEzM2Z3b24zcnUifQ.vTqdwrLUgUS1GLEM4u0UVw'
   );
-  const [showAllUSHelipads, setShowAllUSHelipads] = useState(false);
+  const [showAllUSHelipads, setShowAllUSHelipads] = useState(true);
 
   // Active Map Token check
   const activeToken = mapToken || localToken;
