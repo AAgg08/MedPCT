@@ -37,8 +37,7 @@ export default function MapboxContainer({
   groundRiskScore = 20,
   helicopterRiskScore = 20,
   recommendedMode,
-  mapToken = '',
-  onTokenChange,
+  mapToken = 'pk.eyJ1IjoiYXJ5YW5hIiwiYSI6ImNtcGV0aHlrbDAyZXkycXEzM2Z3b24zcnUifQ.vTqdwrLUgUS1GLEM4u0UVw',  onTokenChange,
   settingPoint,
   onSetPointChange,
 }: MapboxContainerProps) {
