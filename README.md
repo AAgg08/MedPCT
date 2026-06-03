@@ -1,6 +1,6 @@
-# MedPCT 🚁
+# MedPTC 🚁
 
-**MedPCT** is a full-stack medical air transport planning tool that maps every helipad in the United States using merged FAA and OpenStreetMap (OSM) data. Built for emergency responders, flight planners, and medical logistics teams, MedPCT provides an interactive geospatial interface powered by Mapbox and augmented with AI-driven insights via the Gemini API.
+**MedPTC** is a full-stack medical air transport planning tool that maps every helipad in the United States using merged FAA and OpenStreetMap (OSM) data. Built for emergency responders, flight planners, and medical logistics teams, MedPTC provides an interactive geospatial interface powered by Mapbox and augmented with AI-driven insights via the Gemini API.
 
 **Live Demo:** [med-pct.vercel.app](https://med-pct.vercel.app)
 
@@ -40,8 +40,8 @@
 ### Installation
 
 ```bash
-git clone https://github.com/AAgg08/MedPCT.git
-cd MedPCT
+git clone https://github.com/AAgg08/MedPTC.git
+cd MedPTC
 npm install
 ```
 
